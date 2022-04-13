@@ -36,7 +36,6 @@ const ingredientDict = makeDictionary(ufile2, false);
 // 6. 옛날 레시피 코드, 재료명, 재료 용량 형식의 파일을 만든다
 const file3 = fs.readFileSync("레시피+재료정보_20220209.csv");
 const ufile3 = iconv.decode(file3, "euc-kr");
-const recipeIngrdients = [];
 
 // 7. 4번에서 만든 파일에서, '옛날 레시피 코드'를 2번의 사전을 참조해서 업데이트한다.
 // 8. 4번에서 만든 파일에서, '재료명'을 4번의 사전을 참조해서 업데이트한다.
