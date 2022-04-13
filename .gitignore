@@ -4,3 +4,7 @@ node_modules
 레시피+재료정보_20220209.csv
 
 ingredients.csv
+recipeDescription.csv
+recipeIngredient.csv
+recipePk_old_new.csv
+recipes.csv
