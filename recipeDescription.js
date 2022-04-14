@@ -1,19 +1,20 @@
 const fs = require("fs");
 const iconv = require("iconv-lite");
+const mysql = require("mysql2");
 
 function makeDictionary(file, type) {
   const first = type ? 0 : 1;
   const second = type ? 1 : 0;
   let idx = 0;
-  let line = "";
+  let record = "";
   let dictionary = {};
   while (idx < file.length) {
     if (file[idx] !== "\n") {
-      line += file[idx];
+      record += file[idx];
     } else {
-      const splitted = line.split(",").map((chunk) => chunk.trim('"'));
+      const splitted = record.split(",");
       dictionary[splitted[first]] = splitted[second];
-      line = "";
+      record = "";
     }
     idx++;
   }
@@ -30,29 +31,61 @@ const recipeDict = makeDictionary(ufile1, true);
 const file2 = fs.readFileSync("레시피+과정정보_20220209.csv");
 const ufile2 = iconv.decode(file2, "euc-kr");
 let index = 0;
-let line = "";
-let string = "";
+let record = "";
+const records = [];
 let pk = 1;
 while (index < ufile2.length) {
-  if (ufile2[index] !== "\n") {
-    line += ufile2[index];
-  } else {
-    const splitted = line
-      .match(/(?<data>[①②③④⑤⑥⑦⑧⑨⑩\[\]℃~!@#$%^&*\w:가-힇힌히힉\s\d()\/,%.]+)/g)
+  if (ufile2[index] !== "\n") record += ufile2[index];
+  else {
+    const splitted = record
+      .match(
+        /(?<data>[①②③④⑤⑥⑦⑧⑨⑩\[\]℃~!@#$%^&*\w·:가-힇힌히힉\s\d()\/,%.?=]+)/g
+      )
       .filter((chunk) => !(chunk === "," || chunk === ", "));
 
     const oldId = splitted[0];
     const order = splitted[1];
+    const description = splitted[2];
+    const imageUrl = splitted[3] !== " " ? splitted[3] : "EMPTY";
     if (recipeDict[oldId] !== undefined) {
-      string += `${pk},${recipeDict[oldId]},${splitted[2]},${splitted[3]},${order}\n`;
+      records.push(
+        `${pk},${recipeDict[oldId]},"${description}","${imageUrl}",${order}`
+      );
       pk++;
     }
-    line = "";
+    record = "";
   }
   index++;
 }
 
 // csv 파일 생성
-fs.writeFile("recipeDescription.csv", string, "utf-8", () => {
+const csv = records.join("\n");
+fs.writeFile("recipeDescription.csv", csv, "utf-8", () => {
   console.log("done");
 });
+
+const connection = mysql.createConnection({
+  host: "127.0.0.1",
+  port: 3306,
+  user: "typeorm",
+  password: "typeormpassword",
+  database: "capstone",
+});
+
+// 쿼리 생성 & 실행
+const length = records.length;
+for (let i = 0; i < length / 500; i++) {
+  let query = "";
+  let j = 0;
+  while (records[i * 500 + j] !== undefined) {
+    query += `(${records[i * 500 + j]}),`;
+    j++;
+  }
+  query = query.slice(0, query.length - 1);
+  connection.query(
+    `insert into recipe_description (RECIPE_DESCRIPTION_ID, RECIPE_ID, IMAGE_DESCRIPTION, IMAGE_URL, DESCRIPTION_ORDER) values ${query};`,
+    (err, res) => {
+      console.log(err);
+    }
+  );
+}
