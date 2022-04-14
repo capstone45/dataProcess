@@ -1,45 +1,60 @@
 const fs = require("fs");
 const iconv = require("iconv-lite");
+const mysql = require("mysql2");
 
 const rawFile = fs.readFileSync("레시피+기본정보_20220209.csv");
 let utf8Str = iconv.decode(rawFile, "euc-kr");
 
-let idx = 0;
-let line = "";
+let record = "";
+let index = 0;
+let pk = 1;
+const records = [];
 
-let title = [];
-let referenceUrl = "";
-let description = [];
-let thumbnailUrl = [];
-let serving = [];
-let userId = 1;
-
-// 중복 제거 재료 확보
-while (idx < utf8Str.length) {
-  if (utf8Str[idx] !== "\n") {
-    line += utf8Str[idx];
-  } else {
-    const splitted = line.split(",");
-    title.push(splitted[1]);
-    description.push(splitted[2]);
-    thumbnailUrl.push(splitted[14]);
-    serving.push(splitted[9]);
-    line = "";
+while (index < utf8Str.length) {
+  if (utf8Str[index] !== "\n") record += utf8Str[index];
+  else {
+    const splitted = record
+      .match(
+        /(?<data>[①②③④⑤⑥⑦⑧⑨⑩\[\]℃~!@#$%^&*\w·:가-힇힌히힉\s\d()\/,%.?=]+)/g
+      )
+      .filter((chunk) => !(chunk === "," || chunk === ", "));
+    const title = splitted[1];
+    const referenceUrl = "EMPTY";
+    const description = splitted[2];
+    const thumbnailUrl = splitted[13];
+    const serving = splitted[9].slice(0, 1);
+    const userId = 1;
+    records.push(
+      `${pk},"${title}","${referenceUrl}","${description}","${thumbnailUrl}",${
+        Number(serving) + 1
+      },${userId}`
+    );
+    record = "";
+    pk++;
   }
-  idx++;
+  index++;
 }
 
-// csv 데이터 생성
-let string = "";
-let pk = 1;
-title.forEach((_) => {
-  string += `${pk},${title[pk - 1]},${referenceUrl},${description[pk - 1]},${
-    thumbnailUrl[pk - 1]
-  },${serving[pk - 1]},${userId}\n`;
-  pk++;
-});
-
 // csv 파일 생성
-fs.writeFile("recipes.csv", string, "utf-8", () => {
-  console.log("done");
+const csv = records.join("\n");
+fs.writeFile("recipes.csv", csv, "utf-8", () => {});
+
+// 쿼리 생성 & 실행
+const query = `(${records.join("),(")})`;
+console.log(query);
+const connection = mysql.createConnection({
+  host: "127.0.0.1",
+  port: 3306,
+  user: "typeorm",
+  password: "typeormpassword",
+  database: "capstone",
 });
+connection.query(
+  `
+  insert into recipe (recipe_id, title, reference_url, description, thumbnail_url, serving, user_id) values ${query};
+`,
+  (err, res) => {
+    console.log(err);
+    console.log(res);
+  }
+);
