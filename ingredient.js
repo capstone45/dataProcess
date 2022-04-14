@@ -1,36 +1,54 @@
 const fs = require("fs");
 const iconv = require("iconv-lite");
+const mysql = require("mysql2");
 
 const rawFile = fs.readFileSync("레시피+재료정보_20220209.csv");
 let utf8Str = iconv.decode(rawFile, "euc-kr");
 
-let idx = 0;
-let line = "";
-let ingredients = new Set();
+let index = 0;
+const records = [];
+let record = "";
+let ingredientDict = new Set();
+let pk = 1;
 
 // 중복 제거 재료 확보
-while (idx < utf8Str.length) {
-  if (utf8Str[idx] !== "\n") {
-    line += utf8Str[idx];
-  } else {
-    ingredients.add(line.split(",")[2]);
-    line = "";
+while (index < utf8Str.length) {
+  if (utf8Str[index] !== "\n") record += utf8Str[index];
+  else {
+    const splitted = record.split(",");
+    const ingredient = `"${splitted[2]}"`;
+    ingredientDict.add(ingredient);
+    record = "";
   }
-  idx++;
+  index++;
 }
 
-// 원본 csv의 header 제거
-ingredients.delete("재료명");
-
-// csv 데이터 생성
-let string = "";
-let pk = 1;
-ingredients.forEach((ingredient) => {
-  string += `${pk},${ingredient}\n`;
+Array.from(ingredientDict).forEach((ingredient) => {
+  records.push(`${pk},${ingredient}`);
   pk++;
 });
 
 // csv 파일 생성
-fs.writeFile("ingredients.csv", string, "utf8", () => {
+let csv = records.join("\n");
+fs.writeFile("ingredients.csv", csv, "utf8", () => {
   console.log("done");
 });
+
+const connection = mysql.createConnection({
+  host: "127.0.0.1",
+  port: 3306,
+  user: "typeorm",
+  password: "typeormpassword",
+  database: "capstone",
+});
+
+let query = `(${records.join("),(")})`;
+connection.query(
+  `
+  insert into ingredient (ingredient_id, name) values ${query};
+`,
+  (err, res) => {
+    console.log(err);
+    console.log(res);
+  }
+);
